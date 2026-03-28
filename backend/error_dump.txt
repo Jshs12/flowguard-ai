@@ -1,0 +1,40 @@
+
+--- 2026-03-25 19:48:36.487599 ---
+[FlowGuard] CRITICAL ERROR during workflow processing: {'message': "Could not find the table 'public.workflows' in the schema cache", 'code': 'PGRST205', 'hint': None, 'details': None}
+Traceback (most recent call last):
+  File "C:\Users\KIIT0001\OneDrive\Desktop\flowguard-AI\backend\routers\workflows.py", line 38, in process_meeting
+    wf_response = supabase.table("workflows").insert(wf_data).execute()
+  File "C:\Users\KIIT0001\AppData\Roaming\Python\Python313\site-packages\postgrest\_sync\request_builder.py", line 53, in execute
+    raise APIError(dict(json_obj))
+postgrest.exceptions.APIError: {'message': "Could not find the table 'public.workflows' in the schema cache", 'code': 'PGRST205', 'hint': None, 'details': None}
+
+
+--- 2026-03-25 19:49:50.579140 ---
+[FlowGuard] CRITICAL ERROR during workflow processing: {'message': "Could not find the table 'public.workflows' in the schema cache", 'code': 'PGRST205', 'hint': None, 'details': None}
+Traceback (most recent call last):
+  File "C:\Users\KIIT0001\OneDrive\Desktop\flowguard-AI\backend\routers\workflows.py", line 40, in process_meeting
+    wf_response = supabase.table("workflows").insert(wf_data).execute()
+  File "C:\Users\KIIT0001\AppData\Roaming\Python\Python313\site-packages\postgrest\_sync\request_builder.py", line 53, in execute
+    raise APIError(dict(json_obj))
+postgrest.exceptions.APIError: {'message': "Could not find the table 'public.workflows' in the schema cache", 'code': 'PGRST205', 'hint': None, 'details': None}
+
+
+--- 2026-03-25 19:50:41.902892 ---
+[FlowGuard] CRITICAL ERROR during workflow processing: {'message': "Could not find the table 'public.workflows' in the schema cache", 'code': 'PGRST205', 'hint': None, 'details': None}
+Traceback (most recent call last):
+  File "C:\Users\KIIT0001\OneDrive\Desktop\flowguard-AI\backend\routers\workflows.py", line 40, in process_meeting
+    wf_response = supabase.table("workflows").insert(wf_data).execute()
+  File "C:\Users\KIIT0001\AppData\Roaming\Python\Python313\site-packages\postgrest\_sync\request_builder.py", line 53, in execute
+    raise APIError(dict(json_obj))
+postgrest.exceptions.APIError: {'message': "Could not find the table 'public.workflows' in the schema cache", 'code': 'PGRST205', 'hint': None, 'details': None}
+
+
+--- 2026-03-26 18:45:05.574926 ---
+[FlowGuard] CRITICAL ERROR during workflow processing: {'message': "Could not find the table 'public.workflows' in the schema cache", 'code': 'PGRST205', 'hint': None, 'details': None}
+Traceback (most recent call last):
+  File "C:\Users\KIIT0001\OneDrive\Desktop\flowguard-AI\backend\routers\workflows.py", line 40, in process_meeting
+    wf_response = supabase.table("workflows").insert(wf_data).execute()
+  File "C:\Users\KIIT0001\AppData\Roaming\Python\Python313\site-packages\postgrest\_sync\request_builder.py", line 53, in execute
+    raise APIError(dict(json_obj))
+postgrest.exceptions.APIError: {'message': "Could not find the table 'public.workflows' in the schema cache", 'code': 'PGRST205', 'hint': None, 'details': None}
+

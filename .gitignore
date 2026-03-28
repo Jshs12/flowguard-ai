@@ -1,0 +1,21 @@
+# Ignore everything outside this folder
+../
+*.lnk
+*.pdf
+*.zip
+*.exe
+
+# Project ignores
+backend/.env
+.env
+__pycache__/
+*.pyc
+*.db
+node_modules/
+dist/
+logs/
+flake8_output.txt
+pyright_out.txt
+test_groq.py
+fix_secret.py
+test_pipeline.py

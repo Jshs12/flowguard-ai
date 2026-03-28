@@ -1,0 +1,1 @@
+FATAL ERROR: {'message': 'null value in column "department" of relation "users" violates not-null constraint', 'code': '23502', 'hint': None, 'details': 'Failing row contains (71093da0-3f20-4a6c-942a-1b9e869565d6, Test User, test_364ef4@test.com, null, manager, null, active, 0.5, 2026-03-25 19:42:23.709458).'}

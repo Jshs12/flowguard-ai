@@ -1,0 +1,17 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+python-jose[cryptography]
+passlib[bcrypt]
+python-multipart
+pydantic
+langgraph
+langchain-core
+langchain-groq
+python-dotenv
+aiofiles
+APScheduler==3.10.4
+supabase
+postgrest
+httpx
+groq

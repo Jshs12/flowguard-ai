@@ -1,0 +1,61 @@
+services:
+
+  flowguard-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: flowguard-backend
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    env_file:
+      - ./backend/.env
+    environment:
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - JWT_SECRET=${JWT_SECRET}
+      - ENVIRONMENT=production
+    volumes:
+      - ./backend/logs:/app/logs
+    networks:
+      - flowguard-net
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/api/health')"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+  flowguard-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: flowguard-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      flowguard-backend:
+        condition: service_healthy
+    networks:
+      - flowguard-net
+
+  flowguard-lb:
+    image: nginx:alpine
+    container_name: flowguard-lb
+    restart: unless-stopped
+    ports:
+      - "443:443"
+      - "8082:8080"
+    volumes:
+      - ./nginx-lb.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - flowguard-frontend
+      - flowguard-backend
+    networks:
+      - flowguard-net
+
+networks:
+  flowguard-net:
+    driver: bridge
