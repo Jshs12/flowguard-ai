@@ -1,4 +1,5 @@
-const API = '';
+// Line 1 - ADD this:
+const API = import.meta.env.VITE_API_URL || 'http://localhost:8001';
 
 export async function api(path, options = {}) {
   const token = localStorage.getItem('fg_token');
