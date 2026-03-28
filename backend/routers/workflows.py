@@ -78,6 +78,20 @@ def _resolve_assignee(
         "Procurement": ["employee"],
         "General":     ["employee"],
     }
+    dept_alias_map = {
+    "General": "Engineering",
+    "It": "Engineering", 
+    "Tech": "Engineering",
+    "Human Resources": "HR",
+    "Hr": "HR",
+    "Procurement": "Procurement",
+    "Finance": "Finance",
+    "Marketing": "Marketing",
+    "Sales": "Marketing",
+    "Design": "Marketing",
+    "Management": "Management",
+    }
+    dept_normalized = dept_alias_map.get(dept_normalized, dept_normalized)
 
     try:
         res = supabase.table("users").select("*") \
