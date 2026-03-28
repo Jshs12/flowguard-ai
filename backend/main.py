@@ -142,7 +142,7 @@ def root():
     return {"message": "FlowGuard AI Backend Running", "status": "online"}
 
 @app.get("/api/health")
-def health():
+async def health():
     return {
         "status": "online",
         "service": "FlowGuard AI",
