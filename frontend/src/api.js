@@ -1,5 +1,4 @@
-// Line 1 - ADD this:
-const API = import.meta.env.VITE_API_URL || 'http://localhost:8001';
+const API = import.meta.env.VITE_API_URL || 'https://flowguard-ai.onrender.com';
 
 export async function api(path, options = {}) {
   const token = localStorage.getItem('fg_token');
