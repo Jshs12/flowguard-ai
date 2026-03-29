@@ -209,10 +209,16 @@ async def complete_task(task_id: str, user=Depends(allow_all)):
     try:
         import datetime
 
-        try:
-            user_dict = user.model_dump()   
-        except AttributeError:
-            user_dict = user.dict()
+       # ✅ Works for ANY object type - Pydantic v1, v2, or custom class
+        if hasattr(user, 'model_dump'):
+            user_dict = user.model_dump()       # Pydantic v2
+        elif hasattr(user, 'dict'):
+            user_dict = user.dict()             # Pydantic v1
+        else:
+            user_dict = vars(user)              # custom class / dataclass
+
+        user_id   = user_dict.get("id") or user_dict.get("user_id")
+        user_name = user_dict.get("full_name") or user_dict.get("username", "user")
 
         # Mark task as completed
         result = supabase.table("tasks").update({
