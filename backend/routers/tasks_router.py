@@ -374,7 +374,6 @@ def request_split(task_id: str, body: dict, user=Depends(allow_all)):
     # Update task with split request
     supabase.table("tasks").update({
         "split_requested": True,
-        "split_reason":    reason,
         "updated_at":     datetime.datetime.utcnow().isoformat()
     }).eq("id", task_id).execute()
     
