@@ -463,9 +463,9 @@ def approve_split(task_id: str, body: dict, user=Depends(allow_manager_plus)):
                     supabase.table("users").update({"current_workload": curr + 1}).eq("id", new_task["assigned_to"]).execute()
             except Exception: pass
 
-    # Update parent status
+    # Update parent status — use 'completed' as DB check constraint doesn't allow 'split_approved'
     supabase.table("tasks").update({
-        "status":          "split_approved",
+        "status":          "completed",
         "split_requested": False,
         "updated_at":      datetime.datetime.utcnow().isoformat()
     }).eq("id", task_id).execute()
