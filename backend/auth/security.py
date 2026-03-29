@@ -78,16 +78,27 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
     except JWTError:
         raise credentials_exception
 
-    # ✅ Try Supabase, but fall back gracefully if network fails
+    # ✅ Try Supabase, and raise 503 if network fails to avoid silent 403 fallback
     try:
         response = supabase.table("users").select("*").eq("email", username).execute()
         if response.data:
             return User(**response.data[0])
     except Exception as e:
-        print(f"[FlowGuard] WARN: Supabase lookup failed in get_current_user: {e}")
+        print(f"[FlowGuard] ERROR: Supabase connection failed in get_current_user: {e}")
+        # If it's a network error (like getaddrinfo failed), raise 503
+        if "getaddrinfo" in str(e) or "ConnectError" in str(e):
+             raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Backend cannot connect to Supabase. Check your internet or .env configuration.",
+            )
+        # For other errors, still try to fall back or raise 401
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication failed (database unreachable)",
+        )
 
-    # ✅ Fallback: build minimal user from JWT claims only
-    return User(email=username)
+    # If user not found in DB
+    raise credentials_exception
 
 # ── Role checkers ───────────────────────────────────
 class RoleChecker:

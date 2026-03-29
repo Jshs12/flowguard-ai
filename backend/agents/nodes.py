@@ -153,8 +153,7 @@ def _detect_priority(sentence: str) -> str:
 def _detect_department(sentence: str) -> str:
     s = sentence.lower()
     for keyword, dept in DEPARTMENTS.items():
-        # Match only whole words to avoid bias (e.g. 'api' matching 'capitalize')
-        if re.search(r'\b' + re.escape(keyword) + r'\b', s):
+        if keyword in s:
             return dept
     return "General"
 
