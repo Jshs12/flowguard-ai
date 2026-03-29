@@ -135,13 +135,14 @@ def get_tasks(user=Depends(allow_all)):
     role = str(getattr(user, "role", "")).lower()
     dept = getattr(user, "department", None)
 
-    if role == "employee":
-        # Employee only sees their own assigned tasks
-        query = query.eq("assigned_to", user.id)
-    elif role == "manager" and dept:
-        # Managers only see tasks within their own department
-        query = query.eq("department", dept)
-    # Role 'head' (HOD) sees ALL tasks across ALL departments
+    # ✅ RIGHT — dynamic, uses logged-in user's department
+    user_department = safe_user_field(user, "department")
+    if user_department:
+        query = query.eq("department", user_department)
+
+    # Employee, Manager, and Head are all scoped to their user_department here.
+    # We remove the assigned_to filter for employees so they can see all tasks 
+    # in their department as requested.
 
     result = query.order("created_at", desc=True).execute()
     return result.data or []
