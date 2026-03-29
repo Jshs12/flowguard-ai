@@ -45,6 +45,7 @@ export function setAuth(data) {
     role: data.role,
     full_name: data.full_name,
     user_id: data.user_id,
+    department: data.department,
   }));
 }
 

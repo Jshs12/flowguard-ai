@@ -132,14 +132,15 @@ def update_performance_score(user_id: str, task: dict):
 def get_tasks(user=Depends(allow_all)):
     query = supabase.table("tasks").select("*")
 
+    role = str(getattr(user, "role", "")).lower()
+    dept = getattr(user, "department", None)
 
-
-    if user.role == "employee":
+    if role == "employee":
         # Employee only sees their own assigned tasks
         query = query.eq("assigned_to", user.id)
-    # manager and head see ALL tasks — no filter
-
-
+    elif role in ["manager", "head"] and dept:
+        # Managers and Heads only see tasks within their own department
+        query = query.eq("department", dept)
 
     result = query.order("created_at", desc=True).execute()
     return result.data or []
@@ -386,6 +387,7 @@ def request_split(task_id: str, body: dict, user=Depends(allow_all)):
         "agent":       "Employee-Interface",
         "decision":    "split_requested",
         "reason":      reason,
+        "confidence":  1.0,
         "created_at":  datetime.datetime.utcnow().isoformat()
     }).execute()
     
@@ -394,12 +396,32 @@ def request_split(task_id: str, body: dict, user=Depends(allow_all)):
 
 @router.get("/split-requests")
 def get_split_requests(user=Depends(allow_manager_plus)):
-    # Managers see all pending split requests
-    res = supabase.table("tasks").select("*") \
+    # Managers see pending split requests IN THEIR DEPARTMENT
+    dept = getattr(user, "department", None)
+    
+    # Select tasks and their related audit logs where split was requested
+    # Note: We filter for the specific 'split_requested' decision log
+    query = supabase.table("tasks").select("*, audit_logs(reason, decision)") \
         .eq("split_requested", True) \
-        .neq("status", "completed") \
-        .order("created_at", desc=True).execute()
-    return res.data or []
+        .neq("status", "completed")
+    
+    if dept:
+        query = query.eq("department", dept)
+        
+    res = query.order("created_at", desc=True).execute()
+    data = res.data or []
+    
+    # Flatten the latest split reason into the task object for the frontend
+    for task in data:
+        logs = task.get("audit_logs", [])
+        # Find the most recent 'split_requested' log
+        split_logs = [l for l in logs if l.get("decision") == "split_requested"]
+        if split_logs:
+            task["split_reason"] = split_logs[0].get("reason")
+        else:
+            task["split_reason"] = "Not specified"
+            
+    return data
 
 
 @router.post("/{task_id}/approve-split")
@@ -413,6 +435,12 @@ def approve_split(task_id: str, body: dict, user=Depends(allow_manager_plus)):
     if not res.data:
         raise HTTPException(status_code=404, detail="Parent task not found")
     parent = res.data[0]
+
+    # Department scoping
+    user_dept = getattr(user, "department", None)
+    task_dept = parent.get("department")
+    if user_dept and task_dept and user_dept.lower() != task_dept.lower():
+        raise HTTPException(status_code=403, detail=f"Cannot approve task from {task_dept} department")
     
     # Create child tasks
     created_count = 0
@@ -459,6 +487,7 @@ def approve_split(task_id: str, body: dict, user=Depends(allow_manager_plus)):
         "agent":       "Manager-Approval",
         "decision":    "split_approved",
         "reason":      f"Split into {created_count} subtasks",
+        "confidence":  1.0,
         "created_at":  datetime.datetime.utcnow().isoformat()
     }).execute()
     

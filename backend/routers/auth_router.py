@@ -44,6 +44,7 @@ def login(data: LoginRequest):
         username=user["email"],
         full_name=user.get("full_name") or user.get("name", ""),
         user_id=str(user["id"]),
+        department=user.get("department")
     )
 
 
