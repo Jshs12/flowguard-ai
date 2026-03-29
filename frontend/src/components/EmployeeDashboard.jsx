@@ -29,19 +29,22 @@ function Navbar({ user, online }) {
     );
 }
 
-function RiskBadge({ score }) {
-    const color = score > 0.7 ? 'var(--red)' : score > 0.4 ? 'var(--orange)' : 'var(--green)';
+function RiskBadge({ score, isRisk }) {
+    const color =
+        isRisk ? 'var(--red)' :
+            score > 0.75 ? 'var(--red)' :
+                score > 0.5 ? 'var(--orange)' :
+                    score > 0.25 ? 'var(--yellow)' :
+                        'var(--green)';
     return (
-        <span style={{
-            background: color,
-            color: '#000',
-            padding: '2px 8px',
-            borderRadius: 4,
-            fontSize: '0.72rem',
-            fontWeight: 700
-        }}>
-            {(score * 100).toFixed(0)}%
-        </span>
+        <div className="flex gap-1" style={{ alignItems: 'center' }}>
+            <div className="risk-bar-bg">
+                <div className="risk-bar-fill" style={{ width: `${score * 100}%`, background: color }} />
+            </div>
+            <span style={{ fontSize: '0.72rem', color, fontWeight: 600 }}>
+                {(score * 100).toFixed(0)}%{isRisk ? ' ⚠️' : ''}
+            </span>
+        </div>
     );
 }
 
@@ -49,11 +52,21 @@ function TimeLeft({ slaDeadline, deadline }) {
     const dl = slaDeadline || deadline;
     if (!dl) return <span style={{ color: 'var(--text-muted)' }}>No deadline</span>;
     const diff = new Date(dl) - new Date();
-    if (diff <= 0) return <span style={{ color: 'var(--red)', fontWeight: 700 }}>OVERDUE</span>;
-    const hours = Math.ceil(diff / 3600000);
-    if (hours <= 24) return <span style={{ color: 'var(--red)', fontWeight: 600 }}>{hours}h left</span>;
-    const days = Math.ceil(hours / 24);
-    return <span style={{ color: 'var(--yellow)' }}>{days}d left</span>;
+    if (diff <= 0) return <span style={{ color: 'var(--red)', fontWeight: 700 }}>⛔ Overdue</span>;
+    const days = Math.floor(diff / 86400000);
+    const hours = Math.floor((diff % 86400000) / 3600000);
+    const minutes = Math.floor((diff % 3600000) / 60000);
+
+    let color;
+    let text;
+    if (days >= 1) {
+        text = `${days}d ${hours}h left`;
+        color = days <= 1 ? 'var(--red)' : days <= 3 ? 'var(--orange)' : 'var(--green)';
+    } else {
+        text = `${hours}h ${minutes}m left`;
+        color = hours <= 6 ? 'var(--red)' : 'var(--orange)';
+    }
+    return <span style={{ fontSize: '0.72rem', color, fontWeight: 600 }}>{text}</span>;
 }
 
 export default function EmployeeDashboard() {
@@ -348,7 +361,7 @@ export default function EmployeeDashboard() {
                                     <td><span className={`badge badge-${t.priority}`}>{t.priority}</span></td>
                                     <td><span className={`badge badge-${t.status}`}>{t.status}</span></td>
                                     <td><TimeLeft slaDeadline={t.sla_deadline} deadline={t.deadline} /></td>
-                                    <td><RiskBadge score={t.risk_score || 0} /></td>
+                                    <td><RiskBadge score={t.risk_score || 0} isRisk={t.is_delayed_risk} /></td>
                                     <td>
                                         <div className="flex gap-1" style={{ flexWrap: 'wrap' }}>
                                             {t.status !== 'completed' && (
