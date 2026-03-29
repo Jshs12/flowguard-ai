@@ -68,6 +68,9 @@ DEPARTMENTS = {
     "design": "Design",
     "legal": "Legal",
     "sales": "Sales",
+    "management": "Management",
+    "admin": "Management",
+    "operations": "Management",
 }
 
 
@@ -150,7 +153,8 @@ def _detect_priority(sentence: str) -> str:
 def _detect_department(sentence: str) -> str:
     s = sentence.lower()
     for keyword, dept in DEPARTMENTS.items():
-        if keyword in s:
+        # Match only whole words to avoid bias (e.g. 'api' matching 'capitalize')
+        if re.search(r'\b' + re.escape(keyword) + r'\b', s):
             return dept
     return "General"
 
@@ -364,7 +368,7 @@ For each action item return a JSON object with:
 Parse EXACTLY:
 - PRIORITY → risk_score (critical=95, high=80, medium=50, low=25)
 - DEADLINE → days_from_today (1 day=1, 5 days=5, next week=7)
-- DEPARTMENT → auto-assign (HR→HR team, Engineering→Engineering)
+- DEPARTMENT → auto-assign (Marketing→Marketing team, Engineering→Engineering)
 
 
 Transcript:

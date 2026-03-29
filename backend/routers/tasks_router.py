@@ -138,9 +138,10 @@ def get_tasks(user=Depends(allow_all)):
     if role == "employee":
         # Employee only sees their own assigned tasks
         query = query.eq("assigned_to", user.id)
-    elif role in ["manager", "head"] and dept:
-        # Managers and Heads only see tasks within their own department
+    elif role == "manager" and dept:
+        # Managers only see tasks within their own department
         query = query.eq("department", dept)
+    # Role 'head' (HOD) sees ALL tasks across ALL departments
 
     result = query.order("created_at", desc=True).execute()
     return result.data or []
