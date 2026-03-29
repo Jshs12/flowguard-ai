@@ -207,7 +207,27 @@ def list_users(department: str = None, user=Depends(allow_manager_plus)):
     if department:
         query = query.eq("department", department)
     res = query.execute()
-    return res.data
+    users = res.data or []
+
+    # ── Fix: compute real workload from tasks table ──────────────
+    # The current_workload counter in the users table drifts over time.
+    # Instead, count non-completed tasks actually assigned to each user.
+    user_ids = [u["id"] for u in users if u.get("id")]
+    if user_ids:
+        tasks_res = supabase.table("tasks").select(
+            "assigned_to"
+        ).in_("assigned_to", user_ids).neq(
+            "status", "completed"
+        ).execute()
+        task_counts = {}
+        for t in (tasks_res.data or []):
+            aid = t.get("assigned_to")
+            if aid:
+                task_counts[aid] = task_counts.get(aid, 0) + 1
+        for u in users:
+            u["current_workload"] = task_counts.get(u["id"], 0)
+
+    return users
 
 
 
