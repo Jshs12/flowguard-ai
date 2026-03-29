@@ -203,6 +203,43 @@ def update_task(task_id: str, body: dict, user=Depends(allow_all)):
 
 
 
+# ── COMPLETE TASK ─────────────────────────────────────────────────────
+@router.put("/{task_id}/complete")
+async def complete_task(task_id: str, user=Depends(allow_all)):
+    try:
+        import datetime
+
+        # Mark task as completed
+        result = supabase.table("tasks").update({
+            "status": "completed",
+            "completed_at": datetime.datetime.utcnow().isoformat()
+        }).eq("id", task_id).execute()
+
+        if not result.data:
+            raise HTTPException(status_code=404, detail="Task not found")
+
+        task = result.data[0]
+
+        # Log completion
+        supabase.table("logs").insert({
+            "task_id": task_id,
+            "user_id": user["id"],
+            "action": "task_completed",
+            "message": f"Task '{task.get('title', '')}' marked complete by {user.get('full_name', 'user')}",
+            "timestamp": datetime.datetime.utcnow().isoformat()
+        }).execute()
+
+        # Update performance score
+        update_performance_score(user["id"], task)
+
+        return {"message": "Task completed successfully", "task_id": task_id}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 
 # ── AUTO-ASSIGN UNASSIGNED TASK ───────────────────────────────────────
 @router.post("/auto-assign")
