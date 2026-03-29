@@ -19,3 +19,5 @@ pyright_out.txt
 test_groq.py
 fix_secret.py
 test_pipeline.py
+.vercel
+.env*.local

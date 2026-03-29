@@ -64,6 +64,15 @@ export default function EmployeeDashboard() {
     const [showLeaveForm, setShowLeaveForm] = useState(false);
     const [loadingLeave, setLoadingLeave] = useState(false);
     const [leaveForm, setLeaveForm] = useState({ start_date: '', end_date: '', reason: '' });
+    const [perf, setPerf] = useState({
+        score: 0,
+        reliability: 0,
+        avg_speed: 0,
+        tasks_completed: 0,
+        tasks_total: 0,
+        active_tasks: 0,
+        availability_status: 'active'
+    });
 
     useEffect(() => {
         checkHealth().then(setOnline);
@@ -89,29 +98,40 @@ export default function EmployeeDashboard() {
         }
     };
 
+    const fetchPerformance = async () => {
+        try {
+            const data = await api('/api/tasks/performance');
+            setPerf(data);
+        } catch (e) {
+            console.error('Performance fetch error:', e);
+        }
+    };
+
     useEffect(() => {
         fetchTasks();
         fetchMyLeaves();
+        fetchPerformance();
     }, []);
 
     const completeTask = async (taskId) => {
         try {
             await api(`/api/tasks/${taskId}/complete`, { method: 'PUT' });
             fetchTasks();
+            fetchPerformance();
         } catch (e) {
             alert(e.message);
         }
     };
 
     const splitTask = async (taskId) => {
-        if (!window.confirm('Split this task? An available helper from your department will be assigned.')) return;
+        const reason = window.prompt('Why do you need to split this task? (e.g., deadline pressure, complexity)');
+        if (!reason) return;
         try {
-            const res = await api(`/api/tasks/${taskId}/split`, { method: 'POST' });
-            console.log('Split response:', res);
-            // Based on api.js returning res.json() directly, it should be res.helper_assigned
-            // But adding defensive check just in case it's wrapped
-            const helper = res.data ? res.data.helper_assigned : res.helper_assigned;
-            alert('Task split successfully! Helper assigned: ' + helper);
+            await api(`/api/tasks/${taskId}/split-request`, { 
+                method: 'POST',
+                body: JSON.stringify({ reason })
+            });
+            alert('Split request submitted to your manager.');
             fetchTasks();
         } catch (e) {
             alert(e.message);
@@ -168,18 +188,18 @@ export default function EmployeeDashboard() {
                 </div>
                 <div style={{ padding: '1rem', textAlign: 'center' }}>
                     <div style={{ fontSize: '2.4rem', fontWeight: 900, color: 'var(--cyan)' }}>
-                        {user.performance_score ? `${(user.performance_score * 100).toFixed(0)}%` : '—'}
+                        {perf.score}%
                     </div>
                     <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 4, marginBottom: 8 }}>
-                        Reliability: {user.reliability ? `${(user.reliability * 100).toFixed(0)}%` : '—'} &nbsp;·&nbsp;
-                        Avg Speed: {user.avg_completion_time ? `${user.avg_completion_time}h` : '—'}
+                        Reliability: {perf.reliability}% &nbsp;·&nbsp;
+                        Avg Speed: {perf.avg_speed}%
                     </div>
                     <div className="flex gap-2" style={{ justifyContent: 'center', flexWrap: 'wrap' }}>
                         <span className="badge badge-in_progress">
-                            {tasks.filter(t => t.status !== 'completed').length} active tasks
+                            {perf.active_tasks} active tasks
                         </span>
-                        <span className={`badge ${user.availability_status === 'leave' ? 'badge-critical' : 'badge-online'}`}>
-                            {user.availability_status ? user.availability_status.toUpperCase() : 'ACTIVE'}
+                        <span className={`badge ${perf.availability_status === 'leave' ? 'badge-critical' : 'badge-online'}`}>
+                            {perf.availability_status.toUpperCase()}
                         </span>
                     </div>
                 </div>
@@ -290,39 +310,7 @@ export default function EmployeeDashboard() {
                 </div>
             </div>
 
-            {/* Split Requests Section */}
-            {tasks.some(t => t.parent_task_id && t.status === 'pending' && t.assigned_to === user.user_id) && (
-                <div className="card" style={{ marginBottom: '1.5rem', borderLeft: '4px solid var(--yellow)' }}>
-                    <div className="card-header">
-                        <span className="card-title">✂️ Split Requests</span>
-                    </div>
-                    <div style={{ padding: '1rem' }}>
-                        <div className="grid-2">
-                            {tasks.filter(t => t.parent_task_id && t.status === 'pending' && t.assigned_to === user.user_id).map(t => {
-                                const parentTask = tasks.find(pt => pt.id === t.parent_task_id);
-                                return (
-                                    <div key={t.id} className="card" style={{ background: 'rgba(255,255,255,0.03)', padding: '0.75rem' }}>
-                                        <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: 4 }}>{t.title}</div>
-                                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 8 }}>
-                                            Requested by: {parentTask ? parentTask.title : 'Task ' + t.parent_task_id}
-                                        </div>
-                                        <div className="flex gap-2" style={{ alignItems: 'center', justifyContent: 'space-between' }}>
-                                            <span className={`badge badge-${t.priority}`}>{t.priority.toUpperCase()}</span>
-                                            <button 
-                                                className="btn btn-primary" 
-                                                style={{ padding: '4px 10px', fontSize: '0.72rem' }}
-                                                onClick={() => approveSplit(t.parent_task_id)}
-                                            >
-                                                Approve Split
-                                            </button>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-                </div>
-            )}
+            {/* Removed Split Request Acceptance for employees as it is now manager-approved */}
 
             {/* Tasks table */}
             <div className="card">

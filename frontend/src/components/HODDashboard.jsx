@@ -341,6 +341,14 @@ export default function HODDashboard() {
     const [online, setOnline] = useState(false);
     const [tasks, setTasks] = useState([]);
     const [users, setUsers] = useState([]);
+    const [splitReqs, setSplitReqs] = useState([]);
+
+    const fetchSplitReqs = async () => {
+        try {
+            const data = await api('/api/tasks/split-requests');
+            setSplitReqs(data || []);
+        } catch { /* swallow */ }
+    };
 
     useEffect(() => {
         checkHealth().then(setOnline);
@@ -365,6 +373,7 @@ export default function HODDashboard() {
     useEffect(() => {
         fetchTasks();
         fetchUsers();
+        fetchSplitReqs();
     }, []);
 
     const completed = tasks.filter(t => t.status === 'completed').length;
@@ -435,6 +444,60 @@ export default function HODDashboard() {
             <div style={{ marginBottom: '1.5rem' }}>
                 <LeaveApprovals onRefresh={() => { fetchTasks(); fetchUsers(); }} />
             </div>
+
+            {/* Split requests */}
+            {splitReqs.length > 0 && (
+                <div className="card" style={{ marginBottom: '1.5rem', borderColor: 'var(--yellow)' }}>
+                    <div className="card-header">
+                        <span className="card-title">✂️ Task Split Requests</span>
+                        <span className="badge badge-escalated">{splitReqs.length} Pending</span>
+                    </div>
+                    <div className="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Task</th>
+                                    <th>Employee</th>
+                                    <th>Reason</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {splitReqs.map(req => (
+                                    <tr key={req.id}>
+                                        <td>{req.title}</td>
+                                        <td>{req.owner_name}</td>
+                                        <td style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{req.split_reason}</td>
+                                        <td>
+                                            <button 
+                                                className="btn btn-primary" 
+                                                style={{ padding: '4px 10px', fontSize: '0.7rem' }}
+                                                onClick={async () => {
+                                                    if (!window.confirm('Approve this split? AI will create subtasks.')) return;
+                                                    try {
+                                                        await api(`/api/tasks/${req.id}/approve-split`, {
+                                                            method: 'POST',
+                                                            body: JSON.stringify({ subtasks: [
+                                                                { title: `Part 1: ${req.title}`, deadline: req.sla_deadline },
+                                                                { title: `Part 2: ${req.title}`, deadline: req.sla_deadline }
+                                                            ]})
+                                                        });
+                                                        alert('Split approved.');
+                                                        fetchTasks();
+                                                        fetchSplitReqs();
+                                                    } catch (e) { alert(e.message); }
+                                                }}
+                                            >
+                                                ✓ Approve
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
 
             {/* All tasks */}
             <TasksOverview tasks={tasks} />

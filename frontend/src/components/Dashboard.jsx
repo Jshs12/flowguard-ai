@@ -442,6 +442,33 @@ function TasksTable({ tasks, user, onSimulate, onUpdate, onAutoAssign }) {
                       >
                         🔮 What If
                       </button>
+                      {t.split_requested && (
+                        <button
+                          className="btn btn-primary"
+                          style={{
+                            padding: '4px 10px',
+                            fontSize: '0.68rem',
+                            background: 'var(--yellow)',
+                            color: 'black'
+                          }}
+                          onClick={async () => {
+                            if (!window.confirm('Approve this split?')) return;
+                            try {
+                              await api(`/api/tasks/${t.id}/approve-split`, {
+                                method: 'POST',
+                                body: JSON.stringify({ subtasks: [
+                                  { title: `Part 1: ${t.title}`, deadline: t.sla_deadline },
+                                  { title: `Part 2: ${t.title}`, deadline: t.sla_deadline }
+                                ]})
+                              });
+                              alert('Split approved.');
+                              onUpdate();
+                            } catch (e) { alert(e.message); }
+                          }}
+                        >
+                          ✓ Approve Split
+                        </button>
+                      )}
                     </div>
                   </td>
                 )}
@@ -466,7 +493,7 @@ function TasksTable({ tasks, user, onSimulate, onUpdate, onAutoAssign }) {
                         </button>
                       )}
                       {/* ✅ Phase 3 Item 11: Split Task — only when ≤ 2 days left */}
-                      {t.status !== 'completed' &&
+                      {t.status !== 'completed' && !t.split_requested &&
                         isDeadlineClose(t.sla_deadline || t.deadline) && (
                           <button
                             className="btn btn-primary"
@@ -477,21 +504,28 @@ function TasksTable({ tasks, user, onSimulate, onUpdate, onAutoAssign }) {
                               color: 'black',
                             }}
                             onClick={async () => {
+                              const reason = window.prompt('Reason for split?');
+                              if (!reason) return;
                               try {
-                                const res = await api(
-                                  `/api/tasks/${t.id}/split`,
-                                  { method: 'POST' }
-                                );
-                                alert(`✂️ Task split! Helper assigned: ${res.helper}`);
+                                await api(`/api/tasks/${t.id}/split-request`, { 
+                                  method: 'POST',
+                                  body: JSON.stringify({ reason })
+                                });
+                                alert(`Split requested!`);
                                 onUpdate();
                               } catch (e) {
                                 alert(e.message);
                               }
                             }}
                           >
-                            ✂️ Split Task
+                            ✂️ Split
                           </button>
                         )}
+                      {t.split_requested && (
+                        <span className="badge" style={{ background: 'var(--yellow)', color: '#000' }}>
+                          SPLIT PENDING
+                        </span>
+                      )}
                     </div>
                   </td>
                 )}
@@ -1417,6 +1451,17 @@ export default function Dashboard() {
     }
   };
 
+  const [splitReqs, setSplitReqs] = useState([]);
+  const fetchSplitReqs = async () => {
+    if (!['head', 'manager'].includes(user.role)) return;
+    try {
+      const data = await api('/api/tasks/split-requests');
+      setSplitReqs(data || []);
+    } catch {
+      /* swallow */
+    }
+  };
+
 
 
   const fetchUsers = async () => {
@@ -1431,21 +1476,23 @@ export default function Dashboard() {
 
 
 
-  useEffect(() => {
-    fetchTasks();
-    fetchLogs();
-    fetchUsers();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    useEffect(() => {
+        fetchTasks();
+        fetchLogs();
+        fetchUsers();
+        fetchSplitReqs();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
 
 
   // ✅ FIX 3: no duplicate tasks — only fetch from DB, never spread wf.tasks
-  const handleResult = () => {
-    fetchTasks();
-    fetchLogs();
-    fetchUsers();
-  };
+    const handleResult = () => {
+        fetchTasks();
+        fetchLogs();
+        fetchUsers();
+        fetchSplitReqs();
+    };
 
 
 
@@ -1501,6 +1548,61 @@ export default function Dashboard() {
       {/* ✅ Leave Approval Panel — manager/HOD */}
       {['head', 'manager'].includes(user.role) && (
         <LeaveApprovalPanel />
+      )}
+
+      {/* ✅ Split Approvals Panel — manager/HOD */}
+      {['head', 'manager'].includes(user.role) && splitReqs.length > 0 && (
+        <div className="card" style={{ borderColor: 'var(--yellow)', marginBottom: '1.5rem' }}>
+          <div className="card-header">
+            <span className="card-title">✂️ Task Split Requests</span>
+            <span className="badge badge-escalated">{splitReqs.length} Pending</span>
+          </div>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Task</th>
+                  <th>Employee</th>
+                  <th>Reason</th>
+                  <th>Deadline</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {splitReqs.map(req => (
+                  <tr key={req.id}>
+                    <td>{req.title}</td>
+                    <td>{req.owner_name}</td>
+                    <td style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{req.split_reason}</td>
+                    <td>{new Date(req.sla_deadline).toLocaleDateString()}</td>
+                    <td>
+                      <button 
+                        className="btn btn-primary" 
+                        style={{ padding: '4px 10px', fontSize: '0.7rem' }}
+                        onClick={async () => {
+                           if (!window.confirm('Approve this split? AI will create subtasks.')) return;
+                           try {
+                             await api(`/api/tasks/${req.id}/approve-split`, {
+                               method: 'POST',
+                               body: JSON.stringify({ subtasks: [
+                                 { title: `Part 1: ${req.title}`, deadline: req.sla_deadline },
+                                 { title: `Part 2: ${req.title}`, deadline: req.sla_deadline }
+                               ]})
+                             });
+                             alert('Split approved and subtasks created.');
+                             handleResult();
+                           } catch (e) { alert(e.message); }
+                        }}
+                      >
+                        ✓ Approve
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       )}
 
 
