@@ -27,7 +27,15 @@ def hash_password(password: str) -> str:
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return hashlib.sha256(plain.encode()).hexdigest() == hashed
+    # 1. Try standard SHA-256 hash match
+    if hashlib.sha256(plain.encode()).hexdigest() == hashed:
+        return True
+    
+    # 2. Fallback to direct plain-text match (for manually updated DB records like '123123')
+    if plain == hashed:
+        return True
+        
+    return False
 
 
 # ── Token helpers ───────────────────────────────────
