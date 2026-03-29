@@ -374,8 +374,23 @@ function TasksTable({ tasks, user, onSimulate, onUpdate, onAutoAssign }) {
                   )}
                   {t.title}
                 </td>
-                <td>{t.owner_name}</td>
-                <td>{t.department}</td>
+                <td>
+                  <div className="flex gap-1" style={{ alignItems: 'center' }}>
+                    {t.owner_name}
+                    {canEdit && (
+                       <AssignDropdown 
+                         taskId={t.id} 
+                         department={t.department} 
+                         onUpdate={onUpdate} 
+                       />
+                    )}
+                  </div>
+                </td>
+                <td>
+                  <span className="badge" style={{ background: '#00ccff22', color: 'var(--cyan)', border: '1px solid #00ccff44' }}>
+                    {t.department}
+                  </span>
+                </td>
                 <td>
                   <span className={`badge badge-${t.priority}`}>
                     {t.priority}
@@ -550,6 +565,122 @@ function TasksTable({ tasks, user, onSimulate, onUpdate, onAutoAssign }) {
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+
+
+
+/* ─── Manual Assignment Dropdown ─────────────────── */
+function AssignDropdown({ taskId, department, onUpdate }) {
+  const [employees, setEmployees] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [show, setShow] = useState(false);
+
+  useEffect(() => {
+    if (show && department) {
+      const fetchEmployees = async () => {
+        try {
+          const data = await api(`/api/auth/users?department=${encodeURIComponent(department)}`);
+          setEmployees(data || []);
+        } catch (e) {
+          console.error('Failed to fetch employees:', e);
+        }
+      };
+      fetchEmployees();
+    }
+  }, [show, department]);
+
+  const handleAssign = async (userId, userName) => {
+    setLoading(true);
+    try {
+      await api(`/api/tasks/${taskId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ 
+          assigned_to: userId,
+          owner_name: userName 
+        }),
+      });
+      setShow(false);
+      onUpdate();
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={{ position: 'relative', display: 'inline-block' }}>
+      <button 
+        className="btn-icon" 
+        onClick={() => setShow(!show)}
+        title="Change Assignment"
+        style={{ 
+          padding: '2px 4px', 
+          fontSize: '0.8rem', 
+          opacity: 0.6,
+          background: 'none',
+          border: 'none',
+          color: 'var(--cyan)',
+          cursor: 'pointer'
+        }}
+      >
+        {loading ? '...' : '✎'}
+      </button>
+
+      {show && (
+        <>
+          <div 
+            style={{ position: 'fixed', inset: 0, zIndex: 99 }} 
+            onClick={() => setShow(false)} 
+          />
+          <div className="dropdown-menu" style={{ 
+            position: 'absolute', 
+            zIndex: 100, 
+            top: '100%', 
+            left: 0,
+            background: '#0a0e14',
+            border: '1px solid #1e293b',
+            borderRadius: 8,
+            padding: 8,
+            minWidth: 180,
+            boxShadow: '0 10px 25px rgba(0,0,0,0.5)'
+          }}>
+            <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginBottom: 6, padding: '0 4px', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+              Assign ({department})
+            </div>
+            <div style={{ maxHeight: 200, overflowY: 'auto' }}>
+              {employees.length === 0 ? (
+                 <div style={{ fontSize: '0.75rem', padding: '8px 4px', color: 'var(--text-muted)' }}>
+                   No available employees found.
+                 </div>
+              ) : (
+                employees.map(e => (
+                  <div 
+                    key={e.id}
+                    className="dropdown-item-hover"
+                    style={{ 
+                      padding: '8px 10px', 
+                      cursor: 'pointer',
+                      fontSize: '0.8rem',
+                      borderRadius: 4,
+                      color: 'white'
+                    }}
+                    onClick={() => handleAssign(e.id, e.full_name || e.name)}
+                  >
+                    {e.full_name || e.name}
+                    <div style={{ fontSize: '0.65rem', opacity: 0.5 }}>
+                      {e.availability_status?.replace('_', ' ')}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -1498,24 +1629,16 @@ export default function Dashboard() {
 
   const handleAutoAssign = async (task) => {
     try {
-      const res = await fetch(
-        'http://localhost:8001/api/tasks/auto-assign',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${localStorage.getItem('fg_token')}`,
-          },
-          body: JSON.stringify({
-            task_id: task.id,
-            task_type: task.task_type,
-            department: task.department,
-          }),
-        },
-      );
-      const data = await res.json();
+      const data = await api('/api/tasks/auto-assign', {
+        method: 'POST',
+        body: JSON.stringify({
+          task_id: task.id,
+          task_type: task.task_type,
+          department: task.department,
+        }),
+      });
       alert(`Assigned to ${data.assigned_to}`);
-      window.location.reload();
+      handleResult();
     } catch (err) {
       console.error(err);
       alert('Auto assign failed');
