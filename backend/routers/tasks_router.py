@@ -209,6 +209,11 @@ async def complete_task(task_id: str, user=Depends(allow_all)):
     try:
         import datetime
 
+        try:
+            user_dict = user.model_dump()   
+        except AttributeError:
+            user_dict = user.dict()
+
         # Mark task as completed
         result = supabase.table("tasks").update({
             "status": "completed"
