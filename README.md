@@ -83,17 +83,49 @@ python backend/verify_schema_logic.py
 
 ---
 
-## 🎬 Demo Script (3-Minute Hackathon Pitch)
+## 🎬 Demo Script
 
-### The Pitch
-"FlowGuard AI is the brain of your enterprise operations. It takes the noise of meeting transcripts and turns it into the signal of tracked work. No more manual entry. No more forgotten tasks."
+Meeting Notes - Q3 Product Launch Planning
+Date: March 28, 2026
 
-### The Demo Steps
-1. **The Lead**: Start at the Manager Dashboard. Mention high-risk tasks already flagged.
-2. **The Magic**: Paste a raw transcript. Show the system extracting 5 tasks instantly.
-3. **The Intelligence**: Open the **Audit Log**. Show exactly *why* the AI assigned a task to a specific person—mentioning their performance score and current workload.
-4. **The Protection**: Highlight the **PII Masking** toggles—ensuring security.
-5. **The Closing**: Log in as an employee, complete a task, and show the manager's dashboard updating in real-time.
+Action Items:
+
+1. Launch new marketing campaign for Q3 product release.
+   Assigned to: Marketing team. Deadline: 5 days. Priority: high.
+
+2. Submit Q3 budget report to finance department.
+   Deadline: 3 days. Priority: high. Complexity: medium.
+
+3. Conduct engineering review meeting for backend infrastructure.
+   Assigned to: Engineering. Deadline: 7 days. Priority: medium.
+
+4. Review and finalize vendor contracts for procurement.
+   Deadline: 10 days. Priority: low. Complexity: low.
+
+5. Prepare HR onboarding documents for new hires joining next week.
+   Assigned to: HR department. Deadline: 2 days. Priority: critical.
+
+6. Design UI mockups for new dashboard feature.
+   Assigned to: Engineering. Deadline: 4 days. Priority: high. Complexity: high.
+
+7. Conduct security audit on all active APIs.
+   Assigned to: Engineering. Deadline: 14 days. Priority: medium. Complexity: high.
+
+8. Send weekly performance report to management.
+   Assigned to: Management. Deadline: 1 day. Priority: high. Complexity: low.
+
+
+---
+# DEMO ACCOUNTS
+
+Email : manager@company.com
+Password : manager123
+Email : hod@company.com
+Password : hod123
+Email : employee@company.com
+Password : employee123
+   
+
 
 ---
 
