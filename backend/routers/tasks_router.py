@@ -212,7 +212,6 @@ async def complete_task(task_id: str, user=Depends(allow_all)):
         # Mark task as completed
         result = supabase.table("tasks").update({
             "status": "completed",
-            "completed_at": datetime.datetime.utcnow().isoformat()
         }).eq("id", task_id).execute()
 
         if not result.data:
