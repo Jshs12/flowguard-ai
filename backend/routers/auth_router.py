@@ -195,11 +195,14 @@ def me(user=Depends(get_current_user)):
 
 # ── List All Users (HOD + Manager) ───────────────────────────────────
 @router.get("/users")
-def list_users(user=Depends(allow_manager_plus)):
-    res = supabase.table("users").select(
+def list_users(department: str = None, user=Depends(allow_manager_plus)):
+    query = supabase.table("users").select(
         "id, name, full_name, email, role, department, "
         "availability_status, performance_score, reliability, current_workload"
-    ).execute()
+    )
+    if department:
+        query = query.eq("department", department)
+    res = query.execute()
     return res.data
 
 

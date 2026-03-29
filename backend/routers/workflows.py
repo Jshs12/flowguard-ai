@@ -101,21 +101,8 @@ def _resolve_assignee(
         dept_users = res.data or []
 
         if not dept_users:
-            allowed_roles = dept_role_map.get(dept_normalized, ["employee"])
-            print(f"[FlowGuard] [ASSIGN] No dept match '{dept_normalized}', trying roles: {allowed_roles}")
-            all_res = supabase.table("users").select("*") \
-                .eq("availability_status", "active") \
-                .execute()
-            dept_users = [
-                u for u in (all_res.data or [])
-                if u.get("role") in allowed_roles
-            ]
-
-        if not dept_users:
-            print(f"[FlowGuard] [ASSIGN] Role fallback failed, using any active user")
-            dept_users = supabase.table("users").select("*") \
-                .eq("availability_status", "active") \
-                .execute().data or []
+            print(f"[FlowGuard] [ASSIGN] ❌ No active employees found in department '{dept_normalized}'")
+            return None, "Unassigned"
 
         if not dept_users:
             return None, "Unassigned"

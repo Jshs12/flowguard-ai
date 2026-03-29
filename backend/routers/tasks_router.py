@@ -170,7 +170,24 @@ def update_task(task_id: str, body: dict, user=Depends(allow_all)):
     update_data = {k: v for k, v in body.items() if k in allowed_fields}
     update_data["updated_at"] = datetime.datetime.utcnow().isoformat()
 
-
+    # ✅ NEW: Enforce department-scoped assignment
+    if body.get("assigned_to"):
+        assigned_to_id = body["assigned_to"]
+        task_dept      = task.get("department")
+        
+        # Fetch assignee department
+        try:
+            u_res = supabase.table("users").select("department").eq("id", assigned_to_id).single().execute()
+            if u_res.data:
+                assignee_dept = u_res.data.get("department")
+                if assignee_dept and task_dept and assignee_dept.lower() != task_dept.lower():
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Cannot assign {task_dept} task to employee in {assignee_dept} department"
+                    )
+        except HTTPException: raise
+        except Exception as e:
+            print(f"[FlowGuard] Dept validation failed: {e}")
 
     supabase.table("tasks").update(update_data).eq("id", task_id).execute()
 
@@ -306,15 +323,7 @@ def auto_assign_task(body: dict, user=Depends(allow_manager_plus)):
 
 
     if not dept_users:
-        # Fallback to any active employee
-        dept_users = supabase.table("users").select("*") \
-            .eq("availability_status", "active") \
-            .eq("role", "employee").execute().data or []
-
-
-
-    if not dept_users:
-        raise HTTPException(status_code=404, detail="No available employees found")
+        raise HTTPException(status_code=404, detail=f"No available employees found in {department} department")
 
 
 
