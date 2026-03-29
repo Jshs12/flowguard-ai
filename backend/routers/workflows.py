@@ -46,7 +46,8 @@ def compute_risk(priority: str, due_date: str = None) -> float:
 
     if due_date:
         try:
-            days_left = (datetime.date.fromisoformat(str(due_date)[:10]) - datetime.date.today()).days
+            # ✅ FIX: use UTC date to match UTC deadlines
+            days_left = (datetime.date.fromisoformat(str(due_date)[:10]) - datetime.datetime.utcnow().date()).days
             if days_left <= 1:   score += 0.4
             elif days_left <= 3: score += 0.25
             elif days_left <= 7: score += 0.10

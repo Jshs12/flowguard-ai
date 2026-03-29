@@ -133,17 +133,11 @@ def get_tasks(user=Depends(allow_all)):
     query = supabase.table("tasks").select("*")
 
     role = str(getattr(user, "role", "")).lower()
-    dept = getattr(user, "department", None)
 
-    # ✅ FIX: Only employees are scoped to their department.
+    # ✅ Employees see only their OWN assigned tasks.
     # Managers and HODs see ALL tasks across ALL departments.
-    user_department = safe_user_field(user, "department")
-    if role == "employee" and user_department:
-        query = query.eq("department", user_department)
-
-    # Employee, Manager, and Head are all scoped to their user_department here.
-    # We remove the assigned_to filter for employees so they can see all tasks 
-    # in their department as requested.
+    if role == "employee":
+        query = query.eq("assigned_to", user.id)
 
     result = query.order("created_at", desc=True).execute()
     return result.data or []
