@@ -449,14 +449,19 @@ def approve_split(task_id: str, body: dict, user=Depends(allow_manager_plus)):
             "workflow_id":    parent.get("workflow_id"),
             "title":          st.get("title", f"Subtask for {parent['title']}"),
             "description":    f"Split from parent task: {parent['title']}",
+            "task_type":      parent.get("task_type", "general"),
             "assigned_to":    st.get("assigned_to", parent.get("assigned_to")),
-            "owner_name":     "Assigned", # Will be updated by owner name logic if needed
+            "owner_name":     parent.get("owner_name", "Assigned"),
             "department":     parent.get("department"),
             "status":         "pending",
             "priority":       parent.get("priority"),
+            "complexity":     parent.get("complexity", "medium"),
+            "risk_score":     parent.get("risk_score", 0.5),
+            "is_delayed_risk": parent.get("is_delayed_risk", False),
             "deadline":       st.get("deadline", parent.get("sla_deadline")),
             "sla_deadline":   st.get("deadline", parent.get("sla_deadline")),
             "parent_task_id": task_id,
+            "created_by":     parent.get("created_by"),
             "created_at":     datetime.datetime.utcnow().isoformat()
         }
         supabase.table("tasks").insert(new_task).execute()
