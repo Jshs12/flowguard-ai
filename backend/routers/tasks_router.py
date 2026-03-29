@@ -235,14 +235,16 @@ async def complete_task(task_id: str, user=Depends(allow_all)):
 
         task = result.data[0]
 
-        # Log completion to 'logs' table
+        # Log completion to 'audit_logs' table
         try:
-            supabase.table("logs").insert({
-                "task_id":   task_id,
-                "user_id":   user_id,
-                "action":    "task_completed",
-                "message":   f"Task '{task.get('title', 'Untitled')}' marked complete by {user_name}",
-                "timestamp": datetime.datetime.utcnow().isoformat()
+            supabase.table("audit_logs").insert({
+                "task_id":    task_id,
+                "workflow_id": task.get("workflow_id"),
+                "agent":      "Human-Interface",
+                "decision":    "task_completed",
+                "reason":      f"Task '{task.get('title', 'Untitled')}' marked complete by {user_name}",
+                "confidence":  1.0,
+                "created_at":  datetime.datetime.utcnow().isoformat()
             }).execute()
         except Exception as log_err:
             print(f"[FlowGuard] WARN: log insert failed: {log_err}")
@@ -380,10 +382,11 @@ def request_split(task_id: str, body: dict, user=Depends(allow_all)):
     # Log to audit logs
     supabase.table("audit_logs").insert({
         "workflow_id": task.get("workflow_id"),
-        "agent_name":  "Employee-Interface",
-        "action":      "split_requested",
+        "task_id":     task_id,
+        "agent":       "Employee-Interface",
+        "decision":    "split_requested",
         "reason":      reason,
-        "timestamp":   datetime.datetime.utcnow().isoformat()
+        "created_at":  datetime.datetime.utcnow().isoformat()
     }).execute()
     
     return {"message": "Split request submitted"}
@@ -452,10 +455,11 @@ def approve_split(task_id: str, body: dict, user=Depends(allow_manager_plus)):
     # Log approval
     supabase.table("audit_logs").insert({
         "workflow_id": parent.get("workflow_id"),
-        "agent_name":  "Manager-Approval",
-        "action":      "split_approved",
+        "task_id":     task_id,
+        "agent":       "Manager-Approval",
+        "decision":    "split_approved",
         "reason":      f"Split into {created_count} subtasks",
-        "timestamp":   datetime.datetime.utcnow().isoformat()
+        "created_at":  datetime.datetime.utcnow().isoformat()
     }).execute()
     
     return {"message": "Split approved", "subtask_count": created_count}
