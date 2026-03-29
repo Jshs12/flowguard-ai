@@ -16,42 +16,46 @@ router = APIRouter(prefix="/api/tasks", tags=["Tasks"])
 
 
 # ══════════════════════════════════════════════════════
-# ✅ NEW (Phase 1 Items 3,4,5) — Performance Score Engine
-# Efficiency = (CompletionRate * 0.5) + (SpeedScore * 0.3) + (Reliability * 0.2)
-# Score delta based on days before deadline (more days = bigger reward)
-# ══════════════════════════════════════════════════════
+# ── UTILS ─────────────────────────────────────────────────────────────
+def safe_user_field(user, *keys):
+    """Safe extraction — works for Pydantic v1, v2, custom class, or dict."""
+    for key in keys:
+        if isinstance(user, dict):
+            val = user.get(key)
+        else:
+            val = getattr(user, key, None)
+        if val:
+            return val
+    return None
+
+
 def update_performance_score(user_id: str, task: dict):
+    """Updates user performance metrics after task completion."""
     try:
         # ── Fetch user current stats ───────────────────
         u_res = supabase.table("users").select(
             "performance_score, reliability, current_workload"
         ).eq("id", user_id).execute()
 
-
         if not u_res.data:
             return
-
 
         u             = u_res.data[0]
         current_score = float(u.get("performance_score") or 0.5)
         current_rel   = float(u.get("reliability") or 0.5)
-
 
         # ── Fetch all tasks for completion rate ────────
         all_tasks = supabase.table("tasks").select(
             "status, sla_deadline"
         ).eq("assigned_to", user_id).execute().data or []
 
-
         total_assigned  = len(all_tasks)
         total_completed = len([t for t in all_tasks if t["status"] == "completed"])
         completion_rate = total_completed / total_assigned if total_assigned > 0 else 0.5
 
-
         # ── Speed Score: days before deadline ─────────
         deadline_str = task.get("sla_deadline") or task.get("deadline")
         days_before  = 0
-
 
         if deadline_str:
             try:
@@ -59,7 +63,6 @@ def update_performance_score(user_id: str, task: dict):
                 days_before = (deadline_dt - datetime.datetime.utcnow()).days
             except Exception:
                 pass
-
 
         # More days left when completed = higher reward
         if days_before >= 3:
@@ -75,7 +78,6 @@ def update_performance_score(user_id: str, task: dict):
             speed_score = 0.1
             score_delta = -0.03   # completed late — small penalty
 
-
         # ── Reliability: % of tasks completed on time ─
         completed_tasks = [t for t in all_tasks if t["status"] == "completed"]
         reliability     = current_rel  # keep existing if no data
@@ -90,7 +92,6 @@ def update_performance_score(user_id: str, task: dict):
                     pass
             reliability = on_time_count / len(completed_tasks)
 
-
         # ── Final Efficiency Score Formula ─────────────
         # Efficiency = (CompletionRate * 0.5) + (SpeedScore * 0.3) + (Reliability * 0.2)
         efficiency = (
@@ -99,29 +100,25 @@ def update_performance_score(user_id: str, task: dict):
             (reliability     * 0.2)
         )
 
-
         # Blend with existing score — don't hard reset
         new_score = round(min(1.0, max(0.0,
             (current_score * 0.6) + (efficiency * 0.4) + score_delta
         )), 4)
 
-
         new_rel = round(min(1.0, max(0.0,
             (current_rel * 0.7) + (reliability * 0.3)
         )), 4)
 
-
         # ── Persist updated stats ──────────────────────
+        # Bug 2 fix: actually write to users
         supabase.table("users").update({
             "performance_score": new_score,
             "reliability":       new_rel,
+            "avg_completion_time": 100 - (speed_score * 100) # placeholder for speed
         }).eq("id", user_id).execute()
 
-
         print(f"[FlowGuard] 📈 Performance updated: {user_id} "
-              f"score={new_score} (delta={score_delta:+.2f}, "
-              f"days_before_deadline={days_before})")
-
+              f"score={new_score} (delta={score_delta:+.2f})")
 
     except Exception as e:
         print(f"[FlowGuard] WARN: update_performance_score failed: {e}")
@@ -207,22 +204,13 @@ def update_task(task_id: str, body: dict, user=Depends(allow_all)):
 @router.put("/{task_id}/complete")
 async def complete_task(task_id: str, user=Depends(allow_all)):
     try:
-        import datetime
-
-       # ✅ Works for ANY object type - Pydantic v1, v2, or custom class
-        if hasattr(user, 'model_dump'):
-            user_dict = user.model_dump()       # Pydantic v2
-        elif hasattr(user, 'dict'):
-            user_dict = user.dict()             # Pydantic v1
-        else:
-            user_dict = vars(user)              # custom class / dataclass
-
-        user_id   = user_dict.get("id") or user_dict.get("user_id")
-        user_name = user_dict.get("full_name") or user_dict.get("username", "user")
+        user_id   = safe_user_field(user, "id", "user_id")
+        user_name = safe_user_field(user, "full_name", "username", "name", "user")
 
         # Mark task as completed
         result = supabase.table("tasks").update({
-            "status": "completed"
+            "status": "completed",
+            "updated_at": datetime.datetime.utcnow().isoformat()
         }).eq("id", task_id).execute()
 
         if not result.data:
@@ -230,25 +218,68 @@ async def complete_task(task_id: str, user=Depends(allow_all)):
 
         task = result.data[0]
 
-        # Log completion
-        supabase.table("logs").insert({
-            "task_id": task_id,
-            "user_id": user.id,
-            "action": "task_completed",
-            "message": f"Task '{task.get('title', '')}' marked complete by {user.get('full_name', 'user')}",
-            "timestamp": datetime.datetime.utcnow().isoformat()
-        }).execute()
+        # Log completion to 'logs' table
+        try:
+            supabase.table("logs").insert({
+                "task_id":   task_id,
+                "user_id":   user_id,
+                "action":    "task_completed",
+                "message":   f"Task '{task.get('title', 'Untitled')}' marked complete by {user_name}",
+                "timestamp": datetime.datetime.utcnow().isoformat()
+            }).execute()
+        except Exception as log_err:
+            print(f"[FlowGuard] WARN: log insert failed: {log_err}")
+
+        # Update workload
+        try:
+            u_res = supabase.table("users").select("current_workload").eq("id", user_id).execute()
+            if u_res.data:
+                curr = u_res.data[0].get("current_workload", 0) or 0
+                supabase.table("users").update({"current_workload": max(0, curr - 1)}).eq("id", user_id).execute()
+        except Exception:
+            pass
 
         # Update performance score
-        update_performance_score(user.id, task)
+        update_performance_score(user_id, task)
 
         return {"message": "Task completed successfully", "task_id": task_id}
 
     except HTTPException:
         raise
     except Exception as e:
+        print(f"[FlowGuard] ERROR in complete_task: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
+
+# ── PERFORMANCE DASHBOARD ──────────────────────────────────────────────
+@router.get("/performance")
+def get_performance(user=Depends(allow_all)):
+    uid = safe_user_field(user, "id", "user_id")
+    
+    # Fetch user core stats
+    u_res = supabase.table("users").select("*").eq("id", uid).execute()
+    if not u_res.data:
+        raise HTTPException(status_code=404, detail="User not found")
+    user_data = u_res.data[0]
+    
+    # Calculate task totals
+    tasks_res = supabase.table("tasks").select("status").eq("assigned_to", uid).execute()
+    all_tasks = tasks_res.data or []
+    
+    total      = len(all_tasks)
+    completed  = len([t for t in all_tasks if t["status"] == "completed"])
+    active     = len([t for t in all_tasks if t["status"] in ["pending", "in_progress"]])
+    
+    return {
+        "score":               int(float(user_data.get("performance_score", 0.5)) * 100),
+        "reliability":         int(float(user_data.get("reliability", 0.5)) * 100),
+        "avg_speed":           int(float(user_data.get("avg_completion_time", 0.5)) * 100),
+        "tasks_completed":     completed,
+        "tasks_total":         total,
+        "active_tasks":        active,
+        "availability_status": user_data.get("availability_status", "active")
+    }
 
 
 # ── AUTO-ASSIGN UNASSIGNED TASK ───────────────────────────────────────
@@ -316,144 +347,110 @@ def auto_assign_task(body: dict, user=Depends(allow_manager_plus)):
     }
 
 
-    # ══════════════════════════════════════════════════════
-# ✅ NEW (Phase 3 Item 12) — Split Task
-# Employee requests split when deadline is very close.
-# Finds unoccupied dept employee and creates a sub-task.
-# ══════════════════════════════════════════════════════
-@router.post("/{task_id}/split")
-def split_task(task_id: str, user=Depends(allow_all)):
+# ── SPLIT REQUEST FLOW ────────────────────────────────────────────────
+@router.post("/{task_id}/split-request")
+def request_split(task_id: str, body: dict, user=Depends(allow_all)):
+    uid = safe_user_field(user, "id", "user_id")
+    reason = body.get("reason", "Not specified")
+    
+    # Verify task exists and is assigned to caller
     res = supabase.table("tasks").select("*").eq("id", task_id).execute()
     if not res.data:
         raise HTTPException(status_code=404, detail="Task not found")
-
-
+    
     task = res.data[0]
-
-
-    # Only assigned employee or manager can split
-    if user.role == "employee" and task.get("assigned_to") != user.id:
-        raise HTTPException(status_code=403, detail="Not your task")
-
-
-    # ✅ FIX 1: Initialize days_left = 0 BEFORE try block — prevents NameError in audit log
-    days_left = 0
-
-    # Check deadline is actually close (≤ 2 days)
-    try:
-        deadline_dt = datetime.datetime.fromisoformat(str(task["sla_deadline"])[:19])
-        days_left   = (deadline_dt - datetime.datetime.utcnow()).days
-        if days_left > 2:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Task deadline is {days_left} days away — split only allowed within 2 days"
-            )
-    except HTTPException:
-        raise
-    except Exception:
-        pass  # if deadline parse fails, allow split
-
-
-    dept       = (task.get("department") or "General").strip().title()
-    current_id = task.get("assigned_to")
-
-
-    # Find unoccupied (lowest workload) active employee in dept — not current assignee
-    candidates_res = supabase.table("users").select("*") \
-        .eq("department", dept) \
-        .eq("availability_status", "active") \
-        .execute()
-
-
-    candidates = [
-        u for u in (candidates_res.data or [])
-        if u["id"] != current_id and u.get("current_workload", 0) == 0
-    ]
-
-
-    # Fallback: any active employee with lowest workload in dept
-    if not candidates:
-        candidates = [
-            u for u in (candidates_res.data or [])
-            if u["id"] != current_id
-        ]
-
-
-    # Final fallback: any active employee in any dept
-    if not candidates:
-        all_active = supabase.table("users").select("*") \
-            .eq("availability_status", "active") \
-            .eq("role", "employee") \
-            .execute().data or []
-        candidates = [u for u in all_active if u["id"] != current_id]
-
-
-    if not candidates:
-        raise HTTPException(status_code=404, detail="No available employee to help with split")
-
-
-    candidates.sort(key=lambda u: (
-        u.get("current_workload", 0),
-        -float(u.get("performance_score", 0.5) or 0.5)
-    ))
-    helper = candidates[0]
-
-
-    now        = datetime.datetime.utcnow()
-    split_task = {
-        "id":              str(uuid.uuid4()),
-        "workflow_id":     task.get("workflow_id"),
-        "title":           f"[SPLIT] {task['title']}",
-        "description":     f"Split from original task due to deadline pressure. "
-                           f"Help complete: {task.get('description', '')}",
-        "task_type":       task.get("task_type", "general"),
-        "assigned_to":     helper["id"],
-        "owner_name":      helper.get("full_name", "Helper"),
-        "department":      dept,
-        "status":          "pending",
-        "priority":        "critical",          # split tasks are always critical
-        "complexity":      task.get("complexity", "medium"),
-        "risk_score":      task.get("risk_score", 0.8),
-        "is_delayed_risk": True,
-        "sla_deadline":    task["sla_deadline"], # same deadline as parent
-        "deadline":        task["sla_deadline"],
-        "parent_task_id":  task_id,             # linked to original
-        "created_by":      user.id,
-        "created_at":      now.isoformat()
-    }
-
-
-    supabase.table("tasks").insert(split_task).execute()
-
-
-    # Update helper workload
-    supabase.table("users").update({
-        "current_workload": (helper.get("current_workload", 0) or 0) + 1
-    }).eq("id", helper["id"]).execute()
-
-
-    # Log in audit trail
+    if user.role == "employee" and task.get("assigned_to") != uid:
+        raise HTTPException(status_code=403, detail="Not your task to split")
+        
+    # Update task with split request
+    supabase.table("tasks").update({
+        "split_requested": True,
+        "split_reason":    reason,
+        "updated_at":     datetime.datetime.utcnow().isoformat()
+    }).eq("id", task_id).execute()
+    
+    # Log to audit logs
     supabase.table("audit_logs").insert({
         "workflow_id": task.get("workflow_id"),
-        "agent":       "TaskSplitAgent",
-        "decision":    f"✂️ TASK SPLIT: '{task['title']}'",
-        "reason":      f"Deadline in {days_left}d. "   # ✅ FIX 1: now always defined
-                       f"Original: {task.get('owner_name')} | "
-                       f"Helper joined: {helper.get('full_name')} ({dept})",
-        "confidence":  0.95,
-        "created_at":  now.isoformat()
+        "agent_name":  "Employee-Interface",
+        "action":      "split_requested",
+        "reason":      reason,
+        "timestamp":   datetime.datetime.utcnow().isoformat()
     }).execute()
+    
+    return {"message": "Split request submitted"}
 
 
-    print(f"[FlowGuard] ✂️ Task split: '{task['title']}' → helper: {helper.get('full_name')}")
+@router.get("/split-requests")
+def get_split_requests(user=Depends(allow_manager_plus)):
+    # Managers see all pending split requests
+    res = supabase.table("tasks").select("*") \
+        .eq("split_requested", True) \
+        .neq("status", "completed") \
+        .order("created_at", desc=True).execute()
+    return res.data or []
 
 
-    return {
-        "message":      "Task split successfully",
-        "split_task_id": split_task["id"],
-        "helper":        helper.get("full_name"),
-        "department":    dept
-    }
+@router.post("/{task_id}/approve-split")
+def approve_split(task_id: str, body: dict, user=Depends(allow_manager_plus)):
+    subtasks = body.get("subtasks", [])
+    if not subtasks:
+        raise HTTPException(status_code=400, detail="No subtasks provided")
+        
+    # Fetch parent task
+    res = supabase.table("tasks").select("*").eq("id", task_id).execute()
+    if not res.data:
+        raise HTTPException(status_code=404, detail="Parent task not found")
+    parent = res.data[0]
+    
+    # Create child tasks
+    created_count = 0
+    for st in subtasks:
+        child_id = str(uuid.uuid4())
+        new_task = {
+            "id":             child_id,
+            "workflow_id":    parent.get("workflow_id"),
+            "title":          st.get("title", f"Subtask for {parent['title']}"),
+            "description":    f"Split from parent task: {parent['title']}",
+            "assigned_to":    st.get("assigned_to", parent.get("assigned_to")),
+            "owner_name":     "Assigned", # Will be updated by owner name logic if needed
+            "department":     parent.get("department"),
+            "status":         "pending",
+            "priority":       parent.get("priority"),
+            "deadline":       st.get("deadline", parent.get("sla_deadline")),
+            "sla_deadline":   st.get("deadline", parent.get("sla_deadline")),
+            "parent_task_id": task_id,
+            "created_at":     datetime.datetime.utcnow().isoformat()
+        }
+        supabase.table("tasks").insert(new_task).execute()
+        created_count += 1
+        
+        # Increment workload for child assignee
+        if new_task["assigned_to"]:
+            try:
+                u_res = supabase.table("users").select("current_workload").eq("id", new_task["assigned_to"]).execute()
+                if u_res.data:
+                    curr = u_res.data[0].get("current_workload", 0) or 0
+                    supabase.table("users").update({"current_workload": curr + 1}).eq("id", new_task["assigned_to"]).execute()
+            except Exception: pass
+
+    # Update parent status
+    supabase.table("tasks").update({
+        "status":          "split_approved",
+        "split_requested": False,
+        "updated_at":      datetime.datetime.utcnow().isoformat()
+    }).eq("id", task_id).execute()
+    
+    # Log approval
+    supabase.table("audit_logs").insert({
+        "workflow_id": parent.get("workflow_id"),
+        "agent_name":  "Manager-Approval",
+        "action":      "split_approved",
+        "reason":      f"Split into {created_count} subtasks",
+        "timestamp":   datetime.datetime.utcnow().isoformat()
+    }).execute()
+    
+    return {"message": "Split approved", "subtask_count": created_count}
 
 
 
