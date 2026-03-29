@@ -211,7 +211,7 @@ async def complete_task(task_id: str, user=Depends(allow_all)):
 
         # Mark task as completed
         result = supabase.table("tasks").update({
-            "status": "completed",
+            "status": "completed"
         }).eq("id", task_id).execute()
 
         if not result.data:
@@ -222,14 +222,14 @@ async def complete_task(task_id: str, user=Depends(allow_all)):
         # Log completion
         supabase.table("logs").insert({
             "task_id": task_id,
-            "user_id": user["id"],
+            "user_id": user.id,
             "action": "task_completed",
             "message": f"Task '{task.get('title', '')}' marked complete by {user.get('full_name', 'user')}",
             "timestamp": datetime.datetime.utcnow().isoformat()
         }).execute()
 
         # Update performance score
-        update_performance_score(user["id"], task)
+        update_performance_score(user.id, task)
 
         return {"message": "Task completed successfully", "task_id": task_id}
 
