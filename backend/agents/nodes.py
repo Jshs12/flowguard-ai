@@ -525,7 +525,7 @@ def task_generation_agent(state: Dict[str, Any]) -> Dict[str, Any]:
                 sub["parent_task_id"] = parent_id
                 sub["complexity"] = "medium"
                 tasks.append(sub)
-            tasks.append(base_task)
+            # FIXED: Do NOT append base_task if it was split into phases
         else:
             tasks.append(base_task)
 

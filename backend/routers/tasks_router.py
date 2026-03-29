@@ -137,7 +137,7 @@ def get_tasks(user=Depends(allow_all)):
 
     # ✅ RIGHT — dynamic, uses logged-in user's department
     user_department = safe_user_field(user, "department")
-    if user_department:
+    if user_department and role != "head":
         query = query.eq("department", user_department)
 
     # Employee, Manager, and Head are all scoped to their user_department here.
