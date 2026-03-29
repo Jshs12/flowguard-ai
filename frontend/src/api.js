@@ -1,4 +1,4 @@
-const API = import.meta.env.VITE_API_URL || 'https://flowguard-ai.onrender.com';
+const API = import.meta.env.VITE_API_URL || 'http://localhost:8001'; // Default to local backend
 
 export async function api(path, options = {}) {
   const token = localStorage.getItem('fg_token');

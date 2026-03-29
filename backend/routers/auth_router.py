@@ -25,7 +25,10 @@ router = APIRouter(prefix="/api/auth", tags=["Auth"])
 # ── Login ─────────────────────────────────────────────────────────────
 @router.post("/login", response_model=TokenResponse)
 def login(data: LoginRequest):
-    res = supabase.table("users").select("*").eq("email", data.username).execute()
+    # Search by email OR name (username)
+    res = supabase.table("users").select("*") \
+        .or_(f"email.eq.{data.username},name.eq.{data.username}") \
+        .execute()
     if not res.data:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
