@@ -89,7 +89,7 @@ def _resolve_assignee(
     "Finance": "Finance",
     "Marketing": "Marketing",
     "Sales": "Marketing",
-    "Design": "Marketing",
+    "Design": "Design",
     "Management": "Management",
     }
     dept_normalized = dept_alias_map.get(dept_normalized, dept_normalized)

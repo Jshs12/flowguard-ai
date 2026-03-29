@@ -394,17 +394,10 @@ def request_split(task_id: str, body: dict, user=Depends(allow_all)):
 
 @router.get("/split-requests")
 def get_split_requests(user=Depends(allow_manager_plus)):
-    # Managers see pending split requests IN THEIR DEPARTMENT
-    dept = getattr(user, "department", None)
-    
-    # Select tasks and their related audit logs where split was requested
-    # Note: We filter for the specific 'split_requested' decision log
+    # Managers and HODs see ALL pending split requests
     query = supabase.table("tasks").select("*, audit_logs(reason, decision)") \
         .eq("split_requested", True) \
         .neq("status", "completed")
-    
-    if dept:
-        query = query.eq("department", dept)
         
     res = query.order("created_at", desc=True).execute()
     data = res.data or []
@@ -434,12 +427,6 @@ def approve_split(task_id: str, body: dict, user=Depends(allow_manager_plus)):
         raise HTTPException(status_code=404, detail="Parent task not found")
     parent = res.data[0]
 
-    # Department scoping
-    user_dept = getattr(user, "department", None)
-    task_dept = parent.get("department")
-    if user_dept and task_dept and user_dept.lower() != task_dept.lower():
-        raise HTTPException(status_code=403, detail=f"Cannot approve task from {task_dept} department")
-    
     # Create child tasks
     created_count = 0
     for st in subtasks:
